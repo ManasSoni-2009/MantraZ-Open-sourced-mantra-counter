@@ -254,6 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- 8. VOICE RECOGNITION ---
   let recognition = null;
   let isListening = false;
+  let shouldBeListening = false;
   
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   
@@ -262,11 +263,11 @@ document.addEventListener('DOMContentLoaded', () => {
     recognition.continuous = true;
     recognition.interimResults = true;
     
-    let resultMatchCounts = [];
+    let sessionTotalCounted = 0;
     
     recognition.onstart = () => {
       isListening = true;
-      resultMatchCounts = [];
+      sessionTotalCounted = 0;
       btnMic.classList.add('active');
       micIconOn.style.display = 'block';
       micIconOff.style.display = 'none';
@@ -275,75 +276,77 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     recognition.onresult = (event) => {
-      let interimTranscript = '';
-      let newlyFinalTranscript = '';
+      let fullTranscript = '';
+
+      for (let i = 0; i < event.results.length; ++i) {
+        fullTranscript += event.results[i][0].transcript + ' ';
+      }
+
+      const text = fullTranscript.toLowerCase();
+      transcriptPreview.textContent = text.trim() || '...';
 
       const reqExact = settings.sensitivity >= 0.8;
       const triggers = currentMantra.triggers;
 
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        const textChunk = event.results[i][0].transcript.toLowerCase();
-        
-        if (event.results[i].isFinal) {
-          newlyFinalTranscript += event.results[i][0].transcript + ' ';
+      let totalCountInSession = 0;
+      
+      triggers.forEach(t => {
+        if (!t) return;
+        const trigger = t.toLowerCase().trim();
+        if (reqExact) {
+          const words = text.split(/[\s,.'"-]+/);
+          totalCountInSession += words.filter(w => w === trigger).length;
         } else {
-          interimTranscript += event.results[i][0].transcript;
+          let idx = text.indexOf(trigger);
+          while (idx !== -1) {
+            totalCountInSession++;
+            idx = text.indexOf(trigger, idx + trigger.length);
+          }
         }
+      });
+
+      if (totalCountInSession > sessionTotalCounted) {
+        const newMatches = totalCountInSession - sessionTotalCounted;
+        sessionTotalCounted = totalCountInSession;
         
-        // Count triggers in this specific chunk
-        let countInChunk = 0;
-        triggers.forEach(t => {
-          if (!t) return;
-          if (reqExact) {
-            const regex = new RegExp(`\\b${t}\\b`, 'g');
-            const matches = textChunk.match(regex);
-            if (matches) countInChunk += matches.length;
-          } else {
-            let idx = textChunk.indexOf(t);
-            while (idx !== -1) {
-              countInChunk++;
-              idx = textChunk.indexOf(t, idx + t.length);
-            }
-          }
-        });
-        
-        const previouslyAdded = resultMatchCounts[i] || 0;
-        if (countInChunk > previouslyAdded) {
-          const newMatches = countInChunk - previouslyAdded;
-          resultMatchCounts[i] = countInChunk;
-          
-          voiceStatus.classList.add('recognized');
-          setTimeout(() => voiceStatus.classList.remove('recognized'), 500);
-          for (let k = 0; k < newMatches; k++) {
-            incrementCount();
-          }
+        voiceStatus.classList.add('recognized');
+        setTimeout(() => voiceStatus.classList.remove('recognized'), 500);
+        for (let k = 0; k < newMatches; k++) {
+          incrementCount();
         }
       }
-
-      transcriptPreview.textContent = (newlyFinalTranscript + interimTranscript).trim() || '...';
     };
 
     recognition.onerror = (e) => {
       console.error('Speech Recognition Error', e);
       if (e.error === 'not-allowed') {
-        showToast('Microphone access denied.');
+        shouldBeListening = false;
+        showToast('Microphone access denied. Check HTTPS and Permissions.');
         stopListening();
       }
     };
 
     recognition.onend = () => {
-      // Auto restart if intended
-      if (isListening) {
-        try { recognition.start(); } catch(e){}
+      // Auto restart if explicitly meant to be listening (Mobile silent stops fix)
+      if (shouldBeListening) {
+        try { recognition.start(); } catch(e){
+           shouldBeListening = false;
+           stopListening();
+        }
+      } else {
+        stopListening();
       }
     };
   } else {
     btnMic.style.opacity = '0.5';
-    btnMic.addEventListener('click', () => showToast('Voice recognition not supported in this browser.'));
   }
 
   function startListening() {
-    if (!recognition) return;
+    if (!SpeechRecognition) {
+      alert("Voice recognition requires a secure HTTPS connection and a supported browser (Chrome, Safari). If you are accessing this over HTTP on mobile, it will not work. Please open the URL in HTTPS.");
+      return;
+    }
+    shouldBeListening = true;
     recognition.lang = settings.lang;
     try {
       recognition.start();
@@ -351,19 +354,20 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function stopListening() {
-    if (!recognition) return;
+    shouldBeListening = false;
     isListening = false;
+    if (!recognition) return;
     btnMic.classList.remove('active');
     micIconOn.style.display = 'none';
     micIconOff.style.display = 'block';
     voiceStatus.classList.remove('listening', 'recognized');
     voiceLabel.textContent = 'Tap mic to start';
     transcriptPreview.textContent = '';
-    recognition.stop();
+    try { recognition.stop(); } catch(e){}
   }
 
   btnMic.addEventListener('click', () => {
-    if (isListening) {
+    if (shouldBeListening) {
       stopListening();
     } else {
       startListening();
