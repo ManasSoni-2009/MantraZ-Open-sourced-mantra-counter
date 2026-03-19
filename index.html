@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="description" content="MantraZ – A beautiful mantra counter with voice recognition, mala tracking, sessions & history." />
+  <meta name="theme-color" content="#0f0a1a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="format-detection" content="telephone=no" />
+  <title>MantraZ – Mantra Counter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- App Shell -->
+  <div id="app">
+
+    <!-- ─── SPLASH SCREEN ─── -->
+    <div id="screen-splash" class="screen active">
+      <div class="splash-content">
+        <div class="splash-om">ॐ</div>
+        <h1 class="splash-title">MantraZ</h1>
+        <p class="splash-subtitle">Sacred Mantra Counter</p>
+        <div class="splash-loader">
+          <div class="loader-bar"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── HOME / COUNTER SCREEN ─── -->
+    <div id="screen-home" class="screen">
+      <div class="screen-header">
+        <div class="header-left">
+          <span class="header-greeting">Namaste 🙏</span>
+        </div>
+        <div class="header-right">
+          <button class="icon-btn" id="btn-select-mantra" aria-label="Select Mantra">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+          <button class="icon-btn" id="btn-theme-toggle" aria-label="Toggle Theme">
+            <svg id="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            <svg id="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Active Mantra Info -->
+      <div class="mantra-info-bar" id="mantra-info-bar">
+        <div class="mantra-deity-icon" id="mantra-deity-icon">🕉️</div>
+        <div class="mantra-details">
+          <h2 class="mantra-name" id="active-mantra-name">Gayatri Mantra</h2>
+          <p class="mantra-language" id="active-mantra-language">Sanskrit • Vedic</p>
+          <button class="btn-edit-triggers" id="btn-edit-triggers" aria-label="Edit Voice Triggers">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            <span id="active-mantra-triggers">om, swaha</span>
+            <svg class="edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+          </button>
+        </div>
+        <div class="mantra-target-badge" id="mantra-target-badge">108</div>
+      </div>
+
+      <!-- Counter Ring -->
+      <div class="counter-ring-container">
+        <svg class="progress-ring" viewBox="0 0 260 260" aria-hidden="true">
+          <defs>
+            <linearGradient id="ring-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="var(--accent-primary)" />
+              <stop offset="100%" stop-color="var(--accent-secondary)" />
+            </linearGradient>
+          </defs>
+          <circle class="ring-track" cx="130" cy="130" r="112" />
+          <circle class="ring-progress" id="ring-progress" cx="130" cy="130" r="112"
+            stroke-dasharray="703.72"
+            stroke-dashoffset="703.72"
+            stroke="url(#ring-gradient)" />
+        </svg>
+        <div class="counter-center">
+          <div class="count-display" id="count-display">0</div>
+          <div class="count-label" id="count-label">/ 108</div>
+          <div class="mala-display" id="mala-display">Mala 1 of ∞</div>
+        </div>
+        <!-- Mala beads ring (inner) -->
+        <div class="mala-beads" id="mala-beads" aria-hidden="true"></div>
+      </div>
+
+      <!-- Voice Status Indicator -->
+      <div class="voice-status" id="voice-status">
+        <div class="voice-pulse" id="voice-pulse"></div>
+        <span class="voice-label" id="voice-label">Tap mic to start</span>
+      </div>
+
+      <!-- Voice transcript preview -->
+      <div class="transcript-preview" id="transcript-preview"></div>
+
+      <!-- Controls -->
+      <div class="counter-controls">
+        <button class="ctrl-btn ctrl-reset" id="btn-reset" aria-label="Reset Count">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          <span>Reset</span>
+        </button>
+
+        <button class="ctrl-btn ctrl-mic" id="btn-mic" aria-label="Start Voice Recognition" aria-pressed="false">
+          <div class="mic-rings">
+            <div class="mic-ring r1"></div>
+            <div class="mic-ring r2"></div>
+            <div class="mic-ring r3"></div>
+          </div>
+          <svg class="mic-icon" id="mic-icon-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          <svg class="mic-icon" id="mic-icon-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
+
+        <button class="ctrl-btn ctrl-complete" id="btn-complete" aria-label="Complete Session">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Done</span>
+        </button>
+      </div>
+
+      <!-- Mala Count Chips -->
+      <div class="session-stats">
+        <div class="stat-chip">
+          <span class="stat-value" id="stat-malas">0</span>
+          <span class="stat-label">Malas</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-value" id="stat-total">0</span>
+          <span class="stat-label">Total</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-value" id="stat-duration">0:00</span>
+          <span class="stat-label">Time</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── MANTRA LIBRARY SCREEN ─── -->
+    <div id="screen-library" class="screen">
+      <div class="screen-header">
+        <h2 class="screen-title">Mantra Library</h2>
+        <button class="icon-btn" id="btn-add-mantra" aria-label="Add Custom Mantra">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+
+      <div class="search-bar-wrapper">
+        <div class="search-bar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="mantra-search" placeholder="Search mantras…" aria-label="Search mantras" />
+        </div>
+      </div>
+
+      <div class="filter-chips" id="filter-chips">
+        <button class="filter-chip active" data-filter="all">All</button>
+        <button class="filter-chip" data-filter="vedic">Vedic</button>
+        <button class="filter-chip" data-filter="shaiva">Shaiva</button>
+        <button class="filter-chip" data-filter="vaishnava">Vaishnava</button>
+        <button class="filter-chip" data-filter="devi">Devi</button>
+        <button class="filter-chip" data-filter="custom">Custom</button>
+      </div>
+
+      <div class="mantra-list" id="mantra-list">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- ─── HISTORY SCREEN ─── -->
+    <div id="screen-history" class="screen">
+      <div class="screen-header">
+        <h2 class="screen-title">History & Stats</h2>
+        <button class="icon-btn" id="btn-clear-history" aria-label="Clear History">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        </button>
+      </div>
+
+      <!-- Summary Stats -->
+      <div class="stats-grid">
+        <div class="stats-card">
+          <div class="stats-icon">🔥</div>
+          <div class="stats-value" id="total-sessions">0</div>
+          <div class="stats-label">Sessions</div>
+        </div>
+        <div class="stats-card">
+          <div class="stats-icon">📿</div>
+          <div class="stats-value" id="total-count">0</div>
+          <div class="stats-label">Total Count</div>
+        </div>
+        <div class="stats-card">
+          <div class="stats-icon">⚡</div>
+          <div class="stats-value" id="current-streak">0</div>
+          <div class="stats-label">Day Streak</div>
+        </div>
+      </div>
+
+      <!-- Weekly Chart -->
+      <div class="chart-section">
+        <h3 class="section-title">This Week</h3>
+        <canvas id="weekly-chart" height="120" aria-label="Weekly mantra count chart"></canvas>
+      </div>
+
+      <!-- Session List -->
+      <div class="section-title-row">
+        <h3 class="section-title">Recent Sessions</h3>
+        <select class="filter-select" id="history-filter-mantra" aria-label="Filter by mantra">
+          <option value="all">All Mantras</option>
+        </select>
+      </div>
+      <div class="session-list" id="session-list">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- ─── SETTINGS SCREEN ─── -->
+    <div id="screen-settings" class="screen">
+      <div class="screen-header">
+        <h2 class="screen-title">Settings</h2>
+      </div>
+
+      <div class="settings-sections">
+
+        <div class="settings-group">
+          <h3 class="settings-group-title">Appearance</h3>
+          <div class="settings-item">
+            <div class="settings-item-info">
+              <span class="settings-item-label">Dark Mode</span>
+              <span class="settings-item-desc">Beautiful dark spiritual theme</span>
+            </div>
+            <label class="toggle-switch" aria-label="Dark mode toggle">
+              <input type="checkbox" id="setting-dark-mode" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3 class="settings-group-title">Mala Configuration</h3>
+          <div class="settings-item">
+            <div class="settings-item-info">
+              <span class="settings-item-label">Mala Size</span>
+              <span class="settings-item-desc">Beads per mala round</span>
+            </div>
+            <select class="settings-select" id="setting-mala-size" aria-label="Mala size">
+              <option value="27">27</option>
+              <option value="54">54</option>
+              <option value="108" selected>108</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3 class="settings-group-title">Voice Recognition</h3>
+          <div class="settings-item">
+            <div class="settings-item-info">
+              <span class="settings-item-label">Sensitivity</span>
+              <span class="settings-item-desc">Match threshold (lower = stricter)</span>
+            </div>
+            <div class="slider-wrapper">
+              <input type="range" class="settings-slider" id="setting-sensitivity" min="0.3" max="1" step="0.05" value="0.7" aria-label="Voice sensitivity" />
+              <span class="slider-value" id="sensitivity-value">0.7</span>
+            </div>
+          </div>
+          <div class="settings-item">
+            <div class="settings-item-info">
+              <span class="settings-item-label">Language</span>
+              <span class="settings-item-desc">Speech recognition language</span>
+            </div>
+            <select class="settings-select" id="setting-lang" aria-label="Speech language">
+              <option value="hi-IN">Hindi (India)</option>
+              <option value="en-IN" selected>English (India)</option>
+              <option value="en-US">English (US)</option>
+              <option value="sa">Sanskrit</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3 class="settings-group-title">Feedback</h3>
+          <div class="settings-item">
+            <div class="settings-item-info">
+              <span class="settings-item-label">Vibration</span>
+              <span class="settings-item-desc">Haptic feedback on count</span>
+            </div>
+            <label class="toggle-switch" aria-label="Vibration toggle">
+              <input type="checkbox" id="setting-vibration" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-item">
+            <div class="settings-item-info">
+              <span class="settings-item-label">Sound</span>
+              <span class="settings-item-desc">Bell sound on mala completion</span>
+            </div>
+            <label class="toggle-switch" aria-label="Sound toggle">
+              <input type="checkbox" id="setting-sound" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3 class="settings-group-title">Data</h3>
+          <div class="settings-item">
+            <button class="settings-action-btn danger" id="btn-clear-all-data">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+              Clear All Data
+            </button>
+          </div>
+          <div class="settings-item">
+            <button class="settings-action-btn" id="btn-export-data">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export Data (JSON)
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-footer">
+          <p class="app-version">MantraZ v1.0 • Created by Manas Soni 🙏</p>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ─── BOTTOM NAVIGATION ─── -->
+    <nav class="bottom-nav" id="bottom-nav" role="navigation" aria-label="Main navigation">
+      <button class="nav-btn active" data-screen="home" aria-label="Home" aria-current="page">
+        <div class="nav-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+        </div>
+        <span class="nav-label">Counter</span>
+      </button>
+      <button class="nav-btn" data-screen="library" aria-label="Library">
+        <div class="nav-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        </div>
+        <span class="nav-label">Library</span>
+      </button>
+      <button class="nav-btn" data-screen="history" aria-label="History">
+        <div class="nav-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <span class="nav-label">History</span>
+      </button>
+      <button class="nav-btn" data-screen="settings" aria-label="Settings">
+        <div class="nav-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </div>
+        <span class="nav-label">Settings</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- ─── MODALS ─── -->
+
+  <!-- Select Mantra Modal -->
+  <div class="modal-overlay" id="modal-select-mantra" role="dialog" aria-modal="true" aria-label="Select Mantra">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h3 class="modal-title">Select Mantra</h3>
+      <div class="modal-mantra-list" id="modal-mantra-list"></div>
+    </div>
+  </div>
+
+  <!-- Add Custom Mantra Modal -->
+  <div class="modal-overlay" id="modal-add-mantra" role="dialog" aria-modal="true" aria-label="Add Custom Mantra">
+    <div class="modal-sheet modal-sheet-tall">
+      <div class="modal-handle"></div>
+      <h3 class="modal-title">Add Custom Mantra</h3>
+      <form class="mantra-form" id="mantra-form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="form-name">Mantra Name</label>
+          <input class="form-input" type="text" id="form-name" placeholder="e.g., Om Namah Shivaya" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="form-text">Full Mantra Text</label>
+          <textarea class="form-input" id="form-text" rows="3" placeholder="Full text of the mantra…"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="form-deity">Deity / Tradition</label>
+          <input class="form-input" type="text" id="form-deity" placeholder="e.g., Shiva, Vishnu, Devi" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="form-lang">Language</label>
+          <input class="form-input" type="text" id="form-lang" placeholder="e.g., Sanskrit, Hindi" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="form-target">Target Count</label>
+          <input class="form-input" type="number" id="form-target" value="108" min="1" max="10000" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="form-words">Voice Indicator Words</label>
+          <input class="form-input" type="text" id="form-words" placeholder="Comma separated: om, shiva, shivaya" />
+          <span class="form-hint">Words to listen for in your chanting</span>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" id="btn-cancel-mantra">Cancel</button>
+          <button type="submit" class="btn-primary">Save Mantra</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Triggers Modal -->
+  <div class="modal-overlay" id="modal-edit-triggers" role="dialog" aria-modal="true" aria-label="Edit Voice Triggers">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h3 class="modal-title">Voice Triggers</h3>
+      <p class="form-hint" style="text-align:center; margin-bottom:20px;">Words the app listens for to count your mantra.</p>
+      <form class="mantra-form" id="form-edit-triggers">
+        <div class="form-group">
+          <label class="form-label">Comma-separated Words</label>
+          <input class="form-input" type="text" id="input-edit-triggers" placeholder="e.g. om, swaha, shiva" required />
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" id="btn-cancel-triggers">Cancel</button>
+          <button type="submit" class="btn-primary">Save Triggers</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Session Complete Modal -->
+  <div class="modal-overlay" id="modal-session-complete" role="dialog" aria-modal="true" aria-label="Session Complete">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="session-complete-content">
+        <div class="session-complete-icon">🙏</div>
+        <h3 class="session-complete-title">Session Complete!</h3>
+        <p class="session-complete-subtitle" id="complete-subtitle">Jai Shri Ram</p>
+        <div class="session-complete-stats">
+          <div class="complete-stat">
+            <span class="complete-val" id="complete-count">0</span>
+            <span class="complete-label">Mantras</span>
+          </div>
+          <div class="complete-stat">
+            <span class="complete-val" id="complete-malas">0</span>
+            <span class="complete-label">Malas</span>
+          </div>
+          <div class="complete-stat">
+            <span class="complete-val" id="complete-duration">0:00</span>
+            <span class="complete-label">Minutes</span>
+          </div>
+        </div>
+        <div class="complete-actions">
+          <button class="btn-secondary" id="btn-continue-session">Continue</button>
+          <button class="btn-primary" id="btn-save-session">Save Session</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div class="toast" id="toast" role="alert" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
