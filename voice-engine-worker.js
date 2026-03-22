@@ -90,6 +90,14 @@ function overlap(previous, current) {
   return 0;
 }
 
+function arraysEqual(left, right) {
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
+}
+
 function getSession(sessionId) {
   if (!sessions.has(sessionId)) {
     sessions.set(sessionId, { recentTokens: [] });
@@ -108,12 +116,19 @@ self.onmessage = (event) => {
 
   if (type !== 'process-transcript') return;
 
-  const { sessionId, transcript, triggers, sensitivity } = payload;
+  const { sessionId, transcript, triggers, sensitivity, isFinal } = payload;
   const session = getSession(sessionId);
   const normalizedTokens = normalizeTranscript(transcript);
   const triggerSet = buildTriggerSet(triggers || [], sensitivity);
   const overlapped = overlap(session.recentTokens, normalizedTokens);
-  const freshTokens = normalizedTokens.slice(overlapped);
+  const previousTail = session.recentTokens.slice(-normalizedTokens.length);
+  const isRepeatedWindow = Boolean(
+    isFinal
+    && normalizedTokens.length
+    && overlapped === normalizedTokens.length
+    && arraysEqual(previousTail, normalizedTokens)
+  );
+  const freshTokens = isRepeatedWindow ? normalizedTokens : normalizedTokens.slice(overlapped);
   const matchedTokens = freshTokens.filter((token) => tokenMatches(token, triggerSet, sensitivity));
   session.recentTokens = session.recentTokens.concat(freshTokens).slice(-MAX_WINDOW_TOKENS);
 

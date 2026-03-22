@@ -98,6 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (worker) {
     worker.onmessage = ({ data }) => {
       if (!data || data.type !== 'transcript-processed') return;
+      if (!data.payload || data.payload.sessionId !== voiceSessionId) return;
       const { increments, normalizedTranscript, matchedTokens } = data.payload;
       latestProcessedTranscript = normalizedTranscript;
       transcriptPreview.textContent = normalizedTranscript || 'Listening...';
