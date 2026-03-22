@@ -1298,3 +1298,13 @@ textarea.form-input {
   width: 12px;
   height: 12px;
 }
+
+
+.empty-state {
+  background: var(--bg-secondary);
+  border: 1px dashed var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 24px 18px;
+  text-align: center;
+  color: var(--text-secondary);
+}
