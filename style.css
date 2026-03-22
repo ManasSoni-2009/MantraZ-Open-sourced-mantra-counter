@@ -387,6 +387,14 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--danger);
 }
 
+.voice-status .voice-label {
+  text-align: center;
+}
+
+.transcript-preview {
+  word-break: break-word;
+}
+
 @keyframes beat {
   0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.7); }
   100% { transform: scale(1.5); box-shadow: 0 0 0 10px rgba(255, 77, 79, 0); }

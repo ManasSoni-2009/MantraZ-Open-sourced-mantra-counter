@@ -170,6 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
     countLabel.textContent = `/ ${settings.malaSize}`;
     activeMantraTriggers.textContent = mantra.triggers.join(', ');
     resetSession();
+    resetVoiceEngineSession();
     
     if (isListening) stopListening();
   }
@@ -249,89 +250,141 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Manual Tap
   ringContainer.addEventListener('click', incrementCount);
-  btnReset.addEventListener('click', resetSession);
+  btnReset.addEventListener('click', () => {
+    resetSession();
+    resetVoiceEngineSession();
+  });
 
   // --- 8. VOICE RECOGNITION ---
   let recognition = null;
   let isListening = false;
   let shouldBeListening = false;
+  let voiceEngineSessionId = null;
+  let engineAvailable = false;
+  let engineRequestInFlight = false;
+  let pendingTranscript = '';
   
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   
+  async function ensureVoiceEngineSession() {
+    if (voiceEngineSessionId) return true;
+    try {
+      const response = await fetch('/api/voice/session', { method: 'POST' });
+      if (!response.ok) throw new Error('Session creation failed');
+      const data = await response.json();
+      voiceEngineSessionId = data.sessionId;
+      engineAvailable = true;
+      return true;
+    } catch (error) {
+      engineAvailable = false;
+      console.error('Voice engine unavailable', error);
+      showToast('Python voice engine unavailable. Start the app with python server.py');
+      voiceLabel.textContent = 'Python engine offline';
+      return false;
+    }
+  }
+
+  async function resetVoiceEngineSession() {
+    pendingTranscript = '';
+    engineRequestInFlight = false;
+    if (!voiceEngineSessionId) return;
+    try {
+      await fetch('/api/voice/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: voiceEngineSessionId })
+      });
+    } catch (error) {
+      console.error('Unable to reset voice engine session', error);
+    }
+  }
+
+  async function flushTranscriptToEngine(transcript) {
+    pendingTranscript = transcript;
+    if (engineRequestInFlight || !pendingTranscript.trim()) return;
+    if (!(await ensureVoiceEngineSession())) return;
+
+    engineRequestInFlight = true;
+    const transcriptToSend = pendingTranscript;
+    pendingTranscript = '';
+
+    try {
+      const response = await fetch('/api/voice/match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: voiceEngineSessionId,
+          transcript: transcriptToSend,
+          triggers: currentMantra.triggers,
+          sensitivity: Number(settings.sensitivity)
+        })
+      });
+
+      if (!response.ok) throw new Error('Voice match failed');
+      const data = await response.json();
+      engineAvailable = true;
+      transcriptPreview.textContent = data.normalizedTranscript || transcriptToSend.trim() || '...';
+
+      if (data.increments > 0) {
+        voiceStatus.classList.add('recognized');
+        setTimeout(() => voiceStatus.classList.remove('recognized'), 500);
+        for (let k = 0; k < data.increments; k++) incrementCount();
+      }
+    } catch (error) {
+      engineAvailable = false;
+      console.error('Voice engine request failed', error);
+      showToast('Python voice engine connection lost.');
+      stopListening();
+      return;
+    } finally {
+      engineRequestInFlight = false;
+    }
+
+    if (pendingTranscript && pendingTranscript !== transcriptToSend) {
+      flushTranscriptToEngine(pendingTranscript);
+    }
+  }
+
   if (SpeechRecognition) {
     recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    
-    let sessionTotalCounted = 0;
-    
-    recognition.onstart = () => {
+
+    recognition.onstart = async () => {
       isListening = true;
-      sessionTotalCounted = 0;
       btnMic.classList.add('active');
       micIconOn.style.display = 'block';
       micIconOff.style.display = 'none';
       voiceStatus.classList.add('listening');
-      voiceLabel.textContent = 'Listening to chants...';
+      voiceLabel.textContent = 'Listening with Python engine...';
+      await resetVoiceEngineSession();
     };
 
     recognition.onresult = (event) => {
-      let fullTranscript = '';
+      let latestTranscript = '';
 
-      for (let i = 0; i < event.results.length; ++i) {
-        fullTranscript += event.results[i][0].transcript + ' ';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        latestTranscript += `${event.results[i][0].transcript} `;
       }
 
-      const text = fullTranscript.toLowerCase();
-      transcriptPreview.textContent = text.trim() || '...';
-
-      const reqExact = settings.sensitivity >= 0.8;
-      const triggers = currentMantra.triggers;
-
-      let totalCountInSession = 0;
-      
-      triggers.forEach(t => {
-        if (!t) return;
-        const trigger = t.toLowerCase().trim();
-        if (reqExact) {
-          const words = text.split(/[\s,.'"-]+/);
-          totalCountInSession += words.filter(w => w === trigger).length;
-        } else {
-          let idx = text.indexOf(trigger);
-          while (idx !== -1) {
-            totalCountInSession++;
-            idx = text.indexOf(trigger, idx + trigger.length);
-          }
-        }
-      });
-
-      if (totalCountInSession > sessionTotalCounted) {
-        const newMatches = totalCountInSession - sessionTotalCounted;
-        sessionTotalCounted = totalCountInSession;
-        
-        voiceStatus.classList.add('recognized');
-        setTimeout(() => voiceStatus.classList.remove('recognized'), 500);
-        for (let k = 0; k < newMatches; k++) {
-          incrementCount();
-        }
-      }
+      transcriptPreview.textContent = latestTranscript.trim() || '...';
+      flushTranscriptToEngine(latestTranscript);
     };
 
     recognition.onerror = (e) => {
       console.error('Speech Recognition Error', e);
       if (e.error === 'not-allowed') {
         shouldBeListening = false;
-        showToast('Microphone access denied. Check HTTPS and Permissions.');
+        showToast('Microphone access denied. Check browser permissions.');
         stopListening();
       }
     };
 
     recognition.onend = () => {
-      // Auto restart if explicitly meant to be listening (Mobile silent stops fix)
       if (shouldBeListening) {
-        try { recognition.start(); } catch(e){
-           shouldBeListening = false;
-           stopListening();
+        try { recognition.start(); } catch(e) {
+          shouldBeListening = false;
+          stopListening();
         }
       } else {
         stopListening();
@@ -341,11 +394,12 @@ document.addEventListener('DOMContentLoaded', () => {
     btnMic.style.opacity = '0.5';
   }
 
-  function startListening() {
+  async function startListening() {
     if (!SpeechRecognition) {
-      alert("Voice recognition requires a secure HTTPS connection and a supported browser (Chrome, Safari). If you are accessing this over HTTP on mobile, it will not work. Please open the URL in HTTPS.");
+      alert("Voice recognition requires a supported browser such as Chrome or Safari.");
       return;
     }
+    if (!(await ensureVoiceEngineSession())) return;
     shouldBeListening = true;
     recognition.lang = settings.lang;
     try {
@@ -356,14 +410,16 @@ document.addEventListener('DOMContentLoaded', () => {
   function stopListening() {
     shouldBeListening = false;
     isListening = false;
-    if (!recognition) return;
     btnMic.classList.remove('active');
     micIconOn.style.display = 'none';
     micIconOff.style.display = 'block';
     voiceStatus.classList.remove('listening', 'recognized');
-    voiceLabel.textContent = 'Tap mic to start';
+    voiceLabel.textContent = engineAvailable ? 'Tap mic to start' : 'Python engine offline';
     transcriptPreview.textContent = '';
-    try { recognition.stop(); } catch(e){}
+    pendingTranscript = '';
+    if (recognition) {
+      try { recognition.stop(); } catch(e){}
+    }
   }
 
   btnMic.addEventListener('click', () => {
@@ -632,5 +688,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- START ---
+  ensureVoiceEngineSession().then((ready) => {
+    voiceLabel.textContent = ready ? 'Tap mic to start' : 'Python engine offline';
+  });
+
   init();
 });
