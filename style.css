@@ -387,6 +387,14 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--danger);
 }
 
+.voice-status .voice-label {
+  text-align: center;
+}
+
+.transcript-preview {
+  word-break: break-word;
+}
+
 @keyframes beat {
   0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.7); }
   100% { transform: scale(1.5); box-shadow: 0 0 0 10px rgba(255, 77, 79, 0); }
@@ -1289,4 +1297,14 @@ textarea.form-input {
 .btn-edit-triggers svg {
   width: 12px;
   height: 12px;
+}
+
+
+.empty-state {
+  background: var(--bg-secondary);
+  border: 1px dashed var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 24px 18px;
+  text-align: center;
+  color: var(--text-secondary);
 }

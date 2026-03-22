@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="description" content="MantraZ – A beautiful mantra counter with voice recognition, mala tracking, sessions & history." />
+  <meta name="description" content="MantraZ – A beautiful mantra counter with a fast browser-powered voice counting, mala tracking, sessions & history." />
   <meta name="theme-color" content="#0f0a1a" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -90,7 +90,7 @@
       <!-- Voice Status Indicator -->
       <div class="voice-status" id="voice-status">
         <div class="voice-pulse" id="voice-pulse"></div>
-        <span class="voice-label" id="voice-label">Tap mic to start</span>
+        <span class="voice-label" id="voice-label">Preparing voice recognition...</span>
       </div>
 
       <!-- Voice transcript preview -->
@@ -264,7 +264,7 @@
           <div class="settings-item">
             <div class="settings-item-info">
               <span class="settings-item-label">Language</span>
-              <span class="settings-item-desc">Speech recognition language</span>
+              <span class="settings-item-desc">Browser speech recognition language for mantra listening</span>
             </div>
             <select class="settings-select" id="setting-lang" aria-label="Speech language">
               <option value="hi-IN">Hindi (India)</option>

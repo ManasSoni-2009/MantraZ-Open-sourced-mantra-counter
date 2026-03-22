@@ -1,6 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-
-  // --- 1. DEFAULT DATA ---
   const DEFAULT_SETTINGS = {
     darkMode: true,
     malaSize: 108,
@@ -11,37 +9,45 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const DEFAULT_MANTRAS = [
-    { id: '1', name: 'Gayatri Mantra', text: 'Om Bhur Bhuva Swaha...', deity: 'Savitr', lang: 'Sanskrit', target: 108, triggers: ['om', 'swaha', 'svaha', 'bhur'] },
-    { id: '2', name: 'Shiva Panchakshara', text: 'Om Namah Shivaya', deity: 'Shiva', lang: 'Sanskrit', target: 108, triggers: ['om', 'namah', 'shivaya', 'shiva'] },
-    { id: '3', name: 'Maha Mrityunjaya', text: 'Om Tryambakam Yajamahe...', deity: 'Shiva', lang: 'Sanskrit', target: 108, triggers: ['om', 'tryambakam', 'yajamahe', 'swaha'] },
-    { id: '4', name: 'Hare Krishna', text: 'Hare Krishna Hare Krishna...', deity: 'Krishna', lang: 'Sanskrit', target: 108, triggers: ['hare', 'krishna', 'rama'] },
+    { id: '1', name: 'Gayatri Mantra', text: 'Om Bhur Bhuva Swaha...', deity: 'Savitr', category: 'vedic', lang: 'Sanskrit', target: 108, triggers: ['om', 'swaha', 'svaha', 'bhur'] },
+    { id: '2', name: 'Shiva Panchakshara', text: 'Om Namah Shivaya', deity: 'Shiva', category: 'shaiva', lang: 'Sanskrit', target: 108, triggers: ['om', 'namah', 'shivaya', 'shiva'] },
+    { id: '3', name: 'Maha Mrityunjaya', text: 'Om Tryambakam Yajamahe...', deity: 'Shiva', category: 'shaiva', lang: 'Sanskrit', target: 108, triggers: ['om', 'tryambakam', 'yajamahe', 'swaha'] },
+    { id: '4', name: 'Hare Krishna', text: 'Hare Krishna Hare Krishna...', deity: 'Krishna', category: 'vaishnava', lang: 'Sanskrit', target: 108, triggers: ['hare', 'krishna', 'rama'] },
   ];
 
-  // --- 2. STATE ---
-  const savedSettings = JSON.parse(localStorage.getItem('mantraz_settings'));
-  let settings = savedSettings ? { ...DEFAULT_SETTINGS, ...savedSettings } : { ...DEFAULT_SETTINGS };
-  
-  const savedMantras = JSON.parse(localStorage.getItem('mantraz_mantras'));
-  let mantras = savedMantras ? savedMantras : [ ...DEFAULT_MANTRAS ];
-  
+  let settings = { ...DEFAULT_SETTINGS, ...(JSON.parse(localStorage.getItem('mantraz_settings')) || {}) };
+  let mantras = (JSON.parse(localStorage.getItem('mantraz_mantras')) || DEFAULT_MANTRAS).map((mantra) => ({
+    ...mantra,
+    category: mantra.category || inferCategory(mantra),
+    triggers: Array.isArray(mantra.triggers) ? mantra.triggers : []
+  }));
   let history = JSON.parse(localStorage.getItem('mantraz_history')) || [];
-  
-  let currentMantra = mantras.find(m => m.id === localStorage.getItem('mantraz_last_mantra')) || mantras[0];
-  
-  // Session State
+  let currentMantra = mantras.find((mantra) => mantra.id === localStorage.getItem('mantraz_last_mantra')) || mantras[0];
+
   let count = 0;
   let malas = 0;
   let sessionStartTime = null;
   let sessionTimer = null;
   let sessionDuration = 0;
+  let libraryFilter = 'all';
+  let searchTerm = '';
+  let historyFilter = 'all';
+  let toastTimer = null;
 
-  // --- 3. DOM ELEMENTS ---
+  let recognition = null;
+  let isListening = false;
+  let shouldBeListening = false;
+  let speechSupported = false;
+  let voiceSessionId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  let workerReady = false;
+  let transcriptQueue = '';
+  let latestProcessedTranscript = '';
+  const transcriptIdSeen = new Set();
+
   const htmlEl = document.documentElement;
   const screens = document.querySelectorAll('.screen');
   const navBtns = document.querySelectorAll('.nav-btn');
   const splashScreen = document.getElementById('screen-splash');
-
-  // Home counter elements
   const activeMantraName = document.getElementById('active-mantra-name');
   const activeMantraLang = document.getElementById('active-mantra-language');
   const mantraTargetBadge = document.getElementById('mantra-target-badge');
@@ -50,37 +56,27 @@ document.addEventListener('DOMContentLoaded', () => {
   const malaDisplay = document.getElementById('mala-display');
   const ringProgress = document.getElementById('ring-progress');
   const ringContainer = document.querySelector('.counter-center');
-
-  // Stats
   const statMalas = document.getElementById('stat-malas');
   const statTotal = document.getElementById('stat-total');
   const statDuration = document.getElementById('stat-duration');
-
-  // Voice
   const btnMic = document.getElementById('btn-mic');
   const micIconOn = document.getElementById('mic-icon-on');
   const micIconOff = document.getElementById('mic-icon-off');
   const voiceStatus = document.getElementById('voice-status');
   const voiceLabel = document.getElementById('voice-label');
   const transcriptPreview = document.getElementById('transcript-preview');
-
-  // Triggers UI
   const btnEditTriggers = document.getElementById('btn-edit-triggers');
   const activeMantraTriggers = document.getElementById('active-mantra-triggers');
   const modalEditTriggers = document.getElementById('modal-edit-triggers');
   const inputEditTriggers = document.getElementById('input-edit-triggers');
   const formEditTriggers = document.getElementById('form-edit-triggers');
   const btnCancelTriggers = document.getElementById('btn-cancel-triggers');
-
-  // Controls
   const btnReset = document.getElementById('btn-reset');
   const btnComplete = document.getElementById('btn-complete');
   const btnThemeToggle = document.getElementById('btn-theme-toggle');
   const iconSun = document.getElementById('icon-sun');
   const iconMoon = document.getElementById('icon-moon');
   const btnSelectMantra = document.getElementById('btn-select-mantra');
-
-  // Settings
   const toggleDarkMode = document.getElementById('setting-dark-mode');
   const selectMalaSize = document.getElementById('setting-mala-size');
   const sliderSensitivity = document.getElementById('setting-sensitivity');
@@ -88,79 +84,97 @@ document.addEventListener('DOMContentLoaded', () => {
   const selectLang = document.getElementById('setting-lang');
   const toggleVibration = document.getElementById('setting-vibration');
   const toggleSound = document.getElementById('setting-sound');
-
-  // Modals
   const modalSelect = document.getElementById('modal-select-mantra');
   const modalAdd = document.getElementById('modal-add-mantra');
   const modalComplete = document.getElementById('modal-session-complete');
   const modalMantraList = document.getElementById('modal-mantra-list');
-
-  // Library & History
   const mantraListEl = document.getElementById('mantra-list');
+  const mantraSearch = document.getElementById('mantra-search');
+  const filterChips = document.querySelectorAll('.filter-chip');
   const sessionListEl = document.getElementById('session-list');
+  const historyFilterSelect = document.getElementById('history-filter-mantra');
+  const weeklyChart = document.getElementById('weekly-chart');
+  const toast = document.getElementById('toast');
 
-  // --- 4. INITIALIZATION ---
+  const worker = window.Worker ? new Worker('voice-engine-worker.js') : null;
+  if (worker) {
+    worker.onmessage = ({ data }) => {
+      if (!data || data.type !== 'transcript-processed') return;
+      workerReady = true;
+      const { increments, normalizedTranscript, matchedTokens } = data.payload;
+      latestProcessedTranscript = normalizedTranscript;
+      transcriptPreview.textContent = normalizedTranscript || 'Listening...';
+      if (increments > 0) {
+        for (let index = 0; index < increments; index += 1) incrementCount();
+        voiceStatus.classList.add('recognized');
+        setTimeout(() => voiceStatus.classList.remove('recognized'), 500);
+        if (matchedTokens.length) {
+          showToast(`Counted ${matchedTokens.length} mantra${matchedTokens.length > 1 ? 's' : ''}`);
+        }
+      }
+    };
+    worker.postMessage({ type: 'reset-session', payload: { sessionId: voiceSessionId } });
+    workerReady = true;
+  }
+
   function init() {
     applyTheme(settings.darkMode);
     updateSettingsUI();
+    setupSpeechRecognition();
     loadMantra(currentMantra);
     renderMantraLibrary();
     renderHistory();
-    
-    // Remove splash screen after 2s
+    updateVoiceIdleState();
     setTimeout(() => {
       splashScreen.classList.remove('active');
       document.getElementById('screen-home').classList.add('active');
     }, 2000);
   }
 
-  // --- 5. THEME & SETTINGS ---
-  function applyTheme(isDark) {
-    htmlEl.setAttribute('data-theme', isDark ? 'dark' : 'light');
-    if (isDark) {
-      iconSun.style.display = 'block';
-      iconMoon.style.display = 'none';
-    } else {
-      iconSun.style.display = 'none';
-      iconMoon.style.display = 'block';
-    }
+  function inferCategory(mantra) {
+    const text = `${mantra.name} ${mantra.deity} ${mantra.text}`.toLowerCase();
+    if (text.includes('shiva')) return 'shaiva';
+    if (text.includes('krishna') || text.includes('rama') || text.includes('vishnu')) return 'vaishnava';
+    if (text.includes('devi') || text.includes('durga') || text.includes('lakshmi')) return 'devi';
+    if (text.includes('gayatri') || text.includes('vedic')) return 'vedic';
+    return 'custom';
+  }
+
+  function persistMantras() {
+    localStorage.setItem('mantraz_mantras', JSON.stringify(mantras));
   }
 
   function saveSettings() {
     localStorage.setItem('mantraz_settings', JSON.stringify(settings));
   }
 
+  function applyTheme(isDark) {
+    htmlEl.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    iconSun.style.display = isDark ? 'block' : 'none';
+    iconMoon.style.display = isDark ? 'none' : 'block';
+  }
+
   function updateSettingsUI() {
     toggleDarkMode.checked = settings.darkMode;
     selectMalaSize.value = settings.malaSize;
     sliderSensitivity.value = settings.sensitivity;
-    labelSensitivity.textContent = settings.sensitivity;
+    labelSensitivity.textContent = Number(settings.sensitivity).toFixed(2).replace(/0$/, '');
     selectLang.value = settings.lang;
     toggleVibration.checked = settings.vibration;
     toggleSound.checked = settings.sound;
   }
 
-  // --- 6. NAVIGATION ---
-  navBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const targetScreen = btn.dataset.screen;
-      // Update buttons
-      navBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      // Update screens
-      screens.forEach(s => s.classList.remove('active'));
-      document.getElementById(`screen-${targetScreen}`).classList.add('active');
+  function switchScreen(targetScreen) {
+    navBtns.forEach((btn) => {
+      const isActive = btn.dataset.screen === targetScreen;
+      btn.classList.toggle('active', isActive);
+      if (isActive) btn.setAttribute('aria-current', 'page');
+      else btn.removeAttribute('aria-current');
     });
-  });
+    screens.forEach((screen) => screen.classList.remove('active'));
+    document.getElementById(`screen-${targetScreen}`).classList.add('active');
+  }
 
-  btnThemeToggle.addEventListener('click', () => {
-    settings.darkMode = !settings.darkMode;
-    applyTheme(settings.darkMode);
-    saveSettings();
-    updateSettingsUI();
-  });
-
-  // --- 7. COUNTER LOGIC ---
   function loadMantra(mantra) {
     currentMantra = mantra;
     localStorage.setItem('mantraz_last_mantra', mantra.id);
@@ -170,43 +184,32 @@ document.addEventListener('DOMContentLoaded', () => {
     countLabel.textContent = `/ ${settings.malaSize}`;
     activeMantraTriggers.textContent = mantra.triggers.join(', ');
     resetSession();
-    
+    resetVoiceEngineSession();
+    renderModalMantraList();
     if (isListening) stopListening();
   }
 
   function updateCounter() {
     countDisplay.textContent = count;
     statTotal.textContent = count;
-    
-    // Calculate Malas
-    const malaSize = parseInt(settings.malaSize);
-    malas = Math.floor(count / malaSize);
-    const remainder = count % malaSize;
-    
+    malas = Math.floor(count / Number(settings.malaSize));
+    const remainder = count % Number(settings.malaSize);
     malaDisplay.textContent = `Mala ${malas + 1} of ∞`;
     statMalas.textContent = malas;
-
-    // Update SVG Ring
-    const circleCircumference = 703.72; // 2 * pi * r (r=112)
-    const progress = remainder / malaSize;
-    const offset = circleCircumference - (progress * circleCircumference);
-    ringProgress.style.strokeDashoffset = offset;
-
-    // Haptics & Sound
+    const circleCircumference = 703.72;
+    ringProgress.style.strokeDashoffset = circleCircumference - ((remainder / Number(settings.malaSize)) * circleCircumference);
     if (remainder === 0 && count > 0) {
       if (settings.vibration && navigator.vibrate) navigator.vibrate([100, 50, 100]);
       if (settings.sound) playBell();
       showToast('Mala Completed! 🙏');
-    } else if (settings.vibration && navigator.vibrate) {
+    } else if (count > 0 && settings.vibration && navigator.vibrate) {
       navigator.vibrate(20);
     }
   }
 
   function incrementCount() {
-    if (count === 0 && !sessionStartTime) {
-      startSessionTimer();
-    }
-    count++;
+    if (count === 0 && !sessionStartTime) startSessionTimer();
+    count += 1;
     updateCounter();
   }
 
@@ -216,9 +219,10 @@ document.addEventListener('DOMContentLoaded', () => {
     sessionDuration = 0;
     sessionStartTime = null;
     if (sessionTimer) clearInterval(sessionTimer);
+    sessionTimer = null;
+    statDuration.textContent = '0:00';
     updateCounter();
-    statDuration.textContent = "0:00";
-    ringProgress.style.strokeDashoffset = 703.72; // Full empty ring
+    ringProgress.style.strokeDashoffset = 703.72;
   }
 
   function startSessionTimer() {
@@ -232,8 +236,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function playBell() {
-    // Simple synthesized bell for web
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
@@ -247,234 +252,379 @@ document.addEventListener('DOMContentLoaded', () => {
     osc.stop(ctx.currentTime + 2);
   }
 
-  // Manual Tap
-  ringContainer.addEventListener('click', incrementCount);
-  btnReset.addEventListener('click', resetSession);
+  function resetVoiceEngineSession() {
+    voiceSessionId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    transcriptQueue = '';
+    latestProcessedTranscript = '';
+    transcriptIdSeen.clear();
+    transcriptPreview.textContent = '';
+    if (worker) worker.postMessage({ type: 'reset-session', payload: { sessionId: voiceSessionId } });
+  }
 
-  // --- 8. VOICE RECOGNITION ---
-  let recognition = null;
-  let isListening = false;
-  let shouldBeListening = false;
-  
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  
-  if (SpeechRecognition) {
+  function updateVoiceIdleState() {
+    if (!speechSupported) {
+      voiceLabel.textContent = 'Voice recognition not supported in this browser';
+      transcriptPreview.textContent = 'Use Chrome or Safari for voice counting.';
+      btnMic.style.opacity = '0.5';
+      return;
+    }
+    voiceLabel.textContent = 'Tap mic to start on-device voice counting';
+    if (!isListening) transcriptPreview.textContent = latestProcessedTranscript || 'Fast browser speech recognition with smart mantra matching.';
+  }
+
+  function enqueueTranscript(text, isFinal) {
+    const cleaned = String(text || '').trim();
+    if (!cleaned) return;
+    transcriptQueue = cleaned;
+    transcriptPreview.textContent = cleaned;
+    if (!worker) {
+      transcriptPreview.textContent = cleaned;
+      return;
+    }
+    worker.postMessage({
+      type: 'process-transcript',
+      payload: {
+        sessionId: voiceSessionId,
+        transcript: cleaned,
+        triggers: currentMantra.triggers,
+        sensitivity: Number(settings.sensitivity),
+        isFinal
+      }
+    });
+  }
+
+  function setupSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      speechSupported = false;
+      return;
+    }
+
+    speechSupported = true;
     recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    
-    let sessionTotalCounted = 0;
-    
+    recognition.maxAlternatives = 1;
+    recognition.lang = settings.lang;
+
     recognition.onstart = () => {
       isListening = true;
-      sessionTotalCounted = 0;
       btnMic.classList.add('active');
+      btnMic.setAttribute('aria-pressed', 'true');
       micIconOn.style.display = 'block';
       micIconOff.style.display = 'none';
       voiceStatus.classList.add('listening');
-      voiceLabel.textContent = 'Listening to chants...';
+      voiceLabel.textContent = 'Listening for mantra phrases...';
+      transcriptPreview.textContent = 'Speak your mantra naturally.';
+      resetVoiceEngineSession();
     };
 
     recognition.onresult = (event) => {
-      let fullTranscript = '';
-
-      for (let i = 0; i < event.results.length; ++i) {
-        fullTranscript += event.results[i][0].transcript + ' ';
+      let interimTranscript = '';
+      let finalTranscript = '';
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const result = event.results[index];
+        const transcript = result[0]?.transcript || '';
+        const signature = `${index}:${transcript.trim()}:${result.isFinal}`;
+        if (transcriptIdSeen.has(signature)) continue;
+        transcriptIdSeen.add(signature);
+        if (result.isFinal) finalTranscript += `${transcript} `;
+        else interimTranscript += `${transcript} `;
       }
-
-      const text = fullTranscript.toLowerCase();
-      transcriptPreview.textContent = text.trim() || '...';
-
-      const reqExact = settings.sensitivity >= 0.8;
-      const triggers = currentMantra.triggers;
-
-      let totalCountInSession = 0;
-      
-      triggers.forEach(t => {
-        if (!t) return;
-        const trigger = t.toLowerCase().trim();
-        if (reqExact) {
-          const words = text.split(/[\s,.'"-]+/);
-          totalCountInSession += words.filter(w => w === trigger).length;
-        } else {
-          let idx = text.indexOf(trigger);
-          while (idx !== -1) {
-            totalCountInSession++;
-            idx = text.indexOf(trigger, idx + trigger.length);
-          }
-        }
-      });
-
-      if (totalCountInSession > sessionTotalCounted) {
-        const newMatches = totalCountInSession - sessionTotalCounted;
-        sessionTotalCounted = totalCountInSession;
-        
-        voiceStatus.classList.add('recognized');
-        setTimeout(() => voiceStatus.classList.remove('recognized'), 500);
-        for (let k = 0; k < newMatches; k++) {
-          incrementCount();
-        }
-      }
+      if (finalTranscript.trim()) enqueueTranscript(finalTranscript, true);
+      if (interimTranscript.trim()) enqueueTranscript(interimTranscript, false);
     };
 
-    recognition.onerror = (e) => {
-      console.error('Speech Recognition Error', e);
-      if (e.error === 'not-allowed') {
-        shouldBeListening = false;
-        showToast('Microphone access denied. Check HTTPS and Permissions.');
-        stopListening();
+    recognition.onerror = (event) => {
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        showToast('Microphone permission is required for voice counting.');
+      } else if (event.error === 'no-speech') {
+        voiceLabel.textContent = 'Listening... say your mantra clearly';
+      } else {
+        showToast(`Voice recognition error: ${event.error}`);
       }
     };
 
     recognition.onend = () => {
-      // Auto restart if explicitly meant to be listening (Mobile silent stops fix)
       if (shouldBeListening) {
-        try { recognition.start(); } catch(e){
-           shouldBeListening = false;
-           stopListening();
+        try {
+          recognition.start();
+          return;
+        } catch (error) {
+          console.error('Speech restart failed', error);
         }
-      } else {
-        stopListening();
       }
+      stopListening();
     };
-  } else {
-    btnMic.style.opacity = '0.5';
   }
 
   function startListening() {
-    if (!SpeechRecognition) {
-      alert("Voice recognition requires a secure HTTPS connection and a supported browser (Chrome, Safari). If you are accessing this over HTTP on mobile, it will not work. Please open the URL in HTTPS.");
+    if (!speechSupported || !recognition) {
+      showToast('Voice recognition works in Chrome and Safari on secure origins.');
       return;
     }
     shouldBeListening = true;
     recognition.lang = settings.lang;
     try {
       recognition.start();
-    } catch(e) {}
+    } catch (error) {
+      console.error('Speech start failed', error);
+    }
   }
 
   function stopListening() {
     shouldBeListening = false;
     isListening = false;
-    if (!recognition) return;
     btnMic.classList.remove('active');
+    btnMic.setAttribute('aria-pressed', 'false');
     micIconOn.style.display = 'none';
     micIconOff.style.display = 'block';
     voiceStatus.classList.remove('listening', 'recognized');
-    voiceLabel.textContent = 'Tap mic to start';
-    transcriptPreview.textContent = '';
-    try { recognition.stop(); } catch(e){}
-  }
-
-  btnMic.addEventListener('click', () => {
-    if (shouldBeListening) {
-      stopListening();
-    } else {
-      startListening();
+    if (recognition) {
+      try { recognition.stop(); } catch (error) { /* noop */ }
     }
-  });
-
-  // --- 9. MODALS & FORMS ---
-  function openModal(el) { 
-    el.classList.add('active'); 
-    document.body.style.overflow = 'hidden'; // Lock background scrolling
-  }
-  function closeModal(el) { 
-    el.classList.remove('active'); 
-    document.body.style.overflow = ''; // Restore background scrolling
+    updateVoiceIdleState();
   }
 
-  document.querySelectorAll('.modal-overlay').forEach(modal => {
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) closeModal(modal);
-    });
-    modal.querySelector('.modal-handle').addEventListener('click', () => closeModal(modal));
-  });
+  function openModal(element) {
+    element.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
 
-  // Select Mantra
-  btnSelectMantra.addEventListener('click', () => {
-    renderModalMantraList();
-    openModal(modalSelect);
-  });
+  function closeModal(element) {
+    element.classList.remove('active');
+    document.body.style.overflow = '';
+  }
 
   function renderModalMantraList() {
-    modalMantraList.innerHTML = mantras.map(m => `
-      <div class="modal-mantra-item ${m.id === currentMantra.id ? 'selected' : ''}" data-id="${m.id}">
+    modalMantraList.innerHTML = mantras.map((mantra) => `
+      <div class="modal-mantra-item ${mantra.id === currentMantra.id ? 'selected' : ''}" data-id="${mantra.id}">
         <div class="mmi-info">
-          <div style="font-weight: 600">${m.name}</div>
-          <div style="font-size: 13px; color: var(--text-secondary)">${m.deity}</div>
+          <div style="font-weight: 600">${mantra.name}</div>
+          <div style="font-size: 13px; color: var(--text-secondary)">${mantra.deity}</div>
         </div>
-        ${m.id === currentMantra.id ? '✓' : ''}
+        ${mantra.id === currentMantra.id ? '✓' : ''}
       </div>
     `).join('');
-
-    modalMantraList.querySelectorAll('.modal-mantra-item').forEach(el => {
-      el.addEventListener('click', () => {
-        const selected = mantras.find(m => m.id === el.dataset.id);
+    modalMantraList.querySelectorAll('.modal-mantra-item').forEach((item) => {
+      item.addEventListener('click', () => {
+        const selected = mantras.find((mantra) => mantra.id === item.dataset.id);
         if (selected) loadMantra(selected);
         closeModal(modalSelect);
       });
     });
   }
 
-  document.getElementById('btn-add-mantra').addEventListener('click', () => {
-    openModal(modalAdd);
-  });
-  
-  document.getElementById('btn-cancel-mantra').addEventListener('click', () => {
-    closeModal(modalAdd);
-  });
+  function getFilteredMantras() {
+    return mantras.filter((mantra) => {
+      const normalizedTerm = searchTerm.trim().toLowerCase();
+      const matchesSearch = !normalizedTerm || [mantra.name, mantra.text, mantra.deity, mantra.lang, mantra.triggers.join(' ')].join(' ').toLowerCase().includes(normalizedTerm);
+      const matchesFilter = libraryFilter === 'all' || mantra.category === libraryFilter;
+      return matchesSearch && matchesFilter;
+    });
+  }
 
+  function renderMantraLibrary() {
+    const filtered = getFilteredMantras();
+    mantraListEl.innerHTML = filtered.length ? '' : '<div class="empty-state">No mantras match your search yet.</div>';
+    filtered.forEach((mantra) => {
+      const card = document.createElement('div');
+      card.className = 'mantra-card';
+      card.innerHTML = `
+        <div class="mantra-card-icon">🕉️</div>
+        <div class="mantra-card-content">
+          <div class="mantra-card-title">${mantra.name}</div>
+          <div class="mantra-card-desc">${mantra.text.substring(0, 60)}${mantra.text.length > 60 ? '...' : ''}</div>
+          <div class="mantra-tag">${mantra.deity} • ${mantra.category}</div>
+        </div>
+      `;
+      card.addEventListener('click', () => {
+        loadMantra(mantra);
+        switchScreen('home');
+      });
+      mantraListEl.appendChild(card);
+    });
+  }
+
+  function formatCompactNumber(value) {
+    return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(value);
+  }
+
+  function calculateStreak() {
+    if (history.length === 0) return 0;
+    const uniqueDays = [...new Set(history.map((item) => new Date(item.date).setHours(0, 0, 0, 0)))].sort((a, b) => b - a);
+    const today = new Date().setHours(0, 0, 0, 0);
+    if (uniqueDays[0] !== today && uniqueDays[0] !== today - 86400000) return 0;
+    let streak = 1;
+    for (let index = 1; index < uniqueDays.length; index += 1) {
+      if (uniqueDays[index - 1] - uniqueDays[index] === 86400000) streak += 1;
+      else break;
+    }
+    return streak;
+  }
+
+  function renderWeeklyChart() {
+    const context = weeklyChart.getContext('2d');
+    const width = weeklyChart.width = weeklyChart.offsetWidth * devicePixelRatio;
+    const height = weeklyChart.height = weeklyChart.offsetHeight * devicePixelRatio;
+    context.scale(devicePixelRatio, devicePixelRatio);
+    context.clearRect(0, 0, width, height);
+
+    const days = Array.from({ length: 7 }, (_, offset) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (6 - offset));
+      date.setHours(0, 0, 0, 0);
+      return date;
+    });
+
+    const counts = days.map((day) => history.filter((item) => new Date(item.date).setHours(0, 0, 0, 0) === day.getTime()).reduce((sum, item) => sum + item.count, 0));
+    const maxCount = Math.max(...counts, 1);
+    const chartWidth = weeklyChart.clientWidth;
+    const chartHeight = weeklyChart.clientHeight;
+    const barWidth = chartWidth / (counts.length * 1.4);
+
+    counts.forEach((value, index) => {
+      const x = 12 + index * (barWidth + 12);
+      const barHeight = (value / maxCount) * (chartHeight - 36);
+      const y = chartHeight - barHeight - 20;
+      context.fillStyle = 'rgba(255, 126, 95, 0.18)';
+      context.fillRect(x, 12, barWidth, chartHeight - 32);
+      context.fillStyle = '#ff7e5f';
+      context.fillRect(x, y, barWidth, barHeight);
+      context.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary');
+      context.font = '12px Inter';
+      context.textAlign = 'center';
+      context.fillText(days[index].toLocaleDateString([], { weekday: 'short' }).slice(0, 2), x + (barWidth / 2), chartHeight - 4);
+    });
+  }
+
+  function renderHistoryFilterOptions() {
+    const options = ['<option value="all">All Mantras</option>'].concat(
+      mantras.map((mantra) => `<option value="${mantra.id}">${mantra.name}</option>`)
+    );
+    historyFilterSelect.innerHTML = options.join('');
+    historyFilterSelect.value = historyFilter;
+  }
+
+  function renderHistory() {
+    document.getElementById('total-sessions').textContent = history.length;
+    document.getElementById('total-count').textContent = formatCompactNumber(history.reduce((sum, item) => sum + item.count, 0));
+    document.getElementById('current-streak').textContent = calculateStreak();
+    renderHistoryFilterOptions();
+    renderWeeklyChart();
+
+    const filteredHistory = history.filter((item) => historyFilter === 'all' || item.mantraId === historyFilter);
+    sessionListEl.innerHTML = filteredHistory.length ? '' : '<div class="empty-state">No saved sessions yet. Complete a chanting session to see it here.</div>';
+    filteredHistory.slice(0, 20).forEach((session) => {
+      const item = document.createElement('div');
+      item.className = 'session-item';
+      item.innerHTML = `
+        <div class="session-item-left">
+          <div class="session-item-title">${session.mantraName}</div>
+          <div class="session-item-date">${new Date(session.date).toLocaleString()}</div>
+        </div>
+        <div class="session-item-right">
+          <div class="session-item-count">${session.count}</div>
+          <div class="session-item-duration">${Math.floor(session.durationSeconds / 60)}m ${session.durationSeconds % 60}s • ${session.malas} malas</div>
+        </div>
+      `;
+      sessionListEl.appendChild(item);
+    });
+  }
+
+  function showToast(message) {
+    toast.textContent = message;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+
+  navBtns.forEach((btn) => btn.addEventListener('click', () => switchScreen(btn.dataset.screen)));
+  btnThemeToggle.addEventListener('click', () => {
+    settings.darkMode = !settings.darkMode;
+    applyTheme(settings.darkMode);
+    renderWeeklyChart();
+    saveSettings();
+    updateSettingsUI();
+  });
+  ringContainer.addEventListener('click', incrementCount);
+  btnReset.addEventListener('click', () => {
+    resetSession();
+    resetVoiceEngineSession();
+    showToast('Session reset');
+  });
+  btnMic.addEventListener('click', () => (shouldBeListening ? stopListening() : startListening()));
+  btnSelectMantra.addEventListener('click', () => {
+    renderModalMantraList();
+    openModal(modalSelect);
+  });
+  document.getElementById('btn-add-mantra').addEventListener('click', () => openModal(modalAdd));
+  document.getElementById('btn-cancel-mantra').addEventListener('click', () => closeModal(modalAdd));
   btnCancelTriggers.addEventListener('click', () => closeModal(modalEditTriggers));
-
   btnEditTriggers.addEventListener('click', () => {
     inputEditTriggers.value = currentMantra.triggers.join(', ');
     openModal(modalEditTriggers);
   });
 
-  formEditTriggers.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const words = inputEditTriggers.value.split(',').map(w => w.trim().toLowerCase()).filter(w => w.length > 0);
-    if (words.length > 0) {
-      currentMantra.triggers = words;
-      activeMantraTriggers.textContent = words.join(', ');
-      // Upate in mantras array and save
-      const idx = mantras.findIndex(m => m.id === currentMantra.id);
-      if (idx !== -1) mantras[idx] = currentMantra;
-      localStorage.setItem('mantraz_mantras', JSON.stringify(mantras));
-      showToast('Voice triggers updated');
-      closeModal(modalEditTriggers);
-    } else {
+  document.querySelectorAll('.modal-overlay').forEach((modal) => {
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) closeModal(modal);
+    });
+    const handle = modal.querySelector('.modal-handle');
+    if (handle) handle.addEventListener('click', () => closeModal(modal));
+  });
+
+  formEditTriggers.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const words = inputEditTriggers.value.split(',').map((word) => word.trim().toLowerCase()).filter(Boolean);
+    if (!words.length) {
       showToast('Please enter at least one trigger word');
+      return;
     }
-  });
-
-  document.getElementById('mantra-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const name = document.getElementById('form-name').value;
-    const text = document.getElementById('form-text').value;
-    const deity = document.getElementById('form-deity').value;
-    const lang = document.getElementById('form-lang').value;
-    const target = document.getElementById('form-target').value;
-    const words = document.getElementById('form-words').value;
-
-    const newMantra = {
-      id: Date.now().toString(),
-      name, text, deity, lang,
-      target: parseInt(target) || 108,
-      triggers: words.split(',').map(w => w.trim().toLowerCase()).filter(w => w.length > 0)
-    };
-
-    mantras.push(newMantra);
-    localStorage.setItem('mantraz_mantras', JSON.stringify(mantras));
+    currentMantra.triggers = words;
+    const mantraIndex = mantras.findIndex((mantra) => mantra.id === currentMantra.id);
+    if (mantraIndex !== -1) mantras[mantraIndex] = currentMantra;
+    activeMantraTriggers.textContent = words.join(', ');
+    persistMantras();
+    closeModal(modalEditTriggers);
+    resetVoiceEngineSession();
     renderMantraLibrary();
-    closeModal(modalAdd);
-    loadMantra(newMantra);
-    e.target.reset();
-    showToast('Custom Mantra Added!');
+    showToast('Voice triggers updated');
   });
 
-  // Complete Session
+  document.getElementById('mantra-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const name = document.getElementById('form-name').value.trim();
+    const text = document.getElementById('form-text').value.trim();
+    const deity = document.getElementById('form-deity').value.trim() || 'Custom';
+    const lang = document.getElementById('form-lang').value.trim() || 'Sanskrit';
+    const target = Number(document.getElementById('form-target').value) || 108;
+    const triggers = document.getElementById('form-words').value.split(',').map((word) => word.trim().toLowerCase()).filter(Boolean);
+    if (!name || !triggers.length) {
+      showToast('Add a mantra name and at least one trigger word');
+      return;
+    }
+    const mantra = {
+      id: Date.now().toString(),
+      name,
+      text: text || name,
+      deity,
+      lang,
+      target,
+      triggers,
+      category: 'custom'
+    };
+    mantras.unshift(mantra);
+    persistMantras();
+    renderMantraLibrary();
+    renderHistory();
+    closeModal(modalAdd);
+    event.target.reset();
+    loadMantra(mantra);
+    switchScreen('home');
+    showToast('Custom mantra added');
+  });
+
   btnComplete.addEventListener('click', () => {
     if (count === 0) {
       showToast("Session hasn't started yet.");
@@ -483,15 +633,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('complete-subtitle').textContent = currentMantra.name;
     document.getElementById('complete-count').textContent = count;
     document.getElementById('complete-malas').textContent = malas;
-    const mins = Math.floor(sessionDuration / 60);
-    document.getElementById('complete-duration').textContent = mins;
+    document.getElementById('complete-duration').textContent = Math.floor(sessionDuration / 60);
     openModal(modalComplete);
   });
-
-  document.getElementById('btn-continue-session').addEventListener('click', () => {
-    closeModal(modalComplete);
-  });
-
+  document.getElementById('btn-continue-session').addEventListener('click', () => closeModal(modalComplete));
   document.getElementById('btn-save-session').addEventListener('click', () => {
     const session = {
       id: Date.now().toString(),
@@ -504,133 +649,86 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     history.unshift(session);
     localStorage.setItem('mantraz_history', JSON.stringify(history));
-    renderHistory();
     closeModal(modalComplete);
     resetSession();
-    showToast('Session Saved successfully.');
-    // go to history
-    navBtns[2].click();
+    resetVoiceEngineSession();
+    renderHistory();
+    switchScreen('history');
+    showToast('Session saved successfully');
   });
 
-  // --- 10. LIBRARY & HISTORY RENDERING ---
-  function renderMantraLibrary() {
-    mantraListEl.innerHTML = '';
-    mantras.forEach(m => {
-      const card = document.createElement('div');
-      card.className = 'mantra-card';
-      card.innerHTML = `
-        <div class="mantra-card-icon">🕉️</div>
-        <div class="mantra-card-content">
-          <div class="mantra-card-title">${m.name}</div>
-          <div class="mantra-card-desc">${m.text.substring(0, 40)}...</div>
-          <div class="mantra-tag">${m.deity}</div>
-        </div>
-      `;
-      card.addEventListener('click', () => {
-        loadMantra(m);
-        navBtns[0].click(); // go home
-      });
-      mantraListEl.appendChild(card);
-    });
-  }
+  mantraSearch.addEventListener('input', (event) => {
+    searchTerm = event.target.value;
+    renderMantraLibrary();
+  });
 
-  function renderHistory() {
-    document.getElementById('total-sessions').textContent = history.length;
-    const totalCount = history.reduce((sum, s) => sum + s.count, 0);
-    document.getElementById('total-count').textContent = totalCount >= 1000 ? (totalCount/1000).toFixed(1)+'k' : totalCount;
-    
-    // Calculate streak (simple version based on consecutive days)
-    document.getElementById('current-streak').textContent = calculateStreak();
+  filterChips.forEach((chip) => chip.addEventListener('click', () => {
+    filterChips.forEach((button) => button.classList.remove('active'));
+    chip.classList.add('active');
+    libraryFilter = chip.dataset.filter;
+    renderMantraLibrary();
+  }));
 
-    sessionListEl.innerHTML = history.slice(0, 10).map(s => `
-      <div class="session-item">
-        <div class="session-item-left">
-          <div class="session-item-title">${s.mantraName}</div>
-          <div class="session-item-date">${new Date(s.date).toLocaleDateString()}</div>
-        </div>
-        <div class="session-item-right">
-          <div class="session-item-count">${s.count}</div>
-          <div class="session-item-duration">${Math.floor(s.durationSeconds/60)}m ${s.durationSeconds%60}s</div>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  function calculateStreak() {
-    if (history.length === 0) return 0;
-    // Just a placeholder for actual streak logic
-    let streak = 0;
-    const today = new Date().setHours(0,0,0,0);
-    const dates = [...new Set(history.map(h => new Date(h.date).setHours(0,0,0,0)))].sort((a,b)=>b-a);
-    if (dates[0] < today - 86400000) return 0; // Missed yesterday
-    
-    let current = dates[0] === today ? today : dates[0];
-    streak = 1;
-    for(let i=1; i<dates.length; i++) {
-        if (dates[i-1] - dates[i] === 86400000) streak++;
-        else break;
-    }
-    return streak;
-  }
+  historyFilterSelect.addEventListener('change', (event) => {
+    historyFilter = event.target.value;
+    renderHistory();
+  });
 
   document.getElementById('btn-clear-history').addEventListener('click', () => {
-    if (confirm('Are you sure you want to clear all history?')) {
-      history = [];
-      localStorage.setItem('mantraz_history', JSON.stringify([]));
-      renderHistory();
-      showToast('History cleared.');
-    }
+    if (!confirm('Are you sure you want to clear all history?')) return;
+    history = [];
+    localStorage.setItem('mantraz_history', JSON.stringify(history));
+    renderHistory();
+    showToast('History cleared');
   });
 
-  // --- 11. SETTINGS EVENTS ---
-  toggleDarkMode.addEventListener('change', (e) => {
-    settings.darkMode = e.target.checked;
+  toggleDarkMode.addEventListener('change', (event) => {
+    settings.darkMode = event.target.checked;
     applyTheme(settings.darkMode);
+    renderWeeklyChart();
     saveSettings();
   });
-  selectMalaSize.addEventListener('change', (e) => {
-    settings.malaSize = parseInt(e.target.value);
+  selectMalaSize.addEventListener('change', (event) => {
+    settings.malaSize = Number(event.target.value);
     saveSettings();
     updateCounter();
   });
-  sliderSensitivity.addEventListener('input', (e) => {
-    settings.sensitivity = e.target.value;
-    labelSensitivity.textContent = e.target.value;
+  sliderSensitivity.addEventListener('input', (event) => {
+    settings.sensitivity = Number(event.target.value);
+    labelSensitivity.textContent = Number(settings.sensitivity).toFixed(2).replace(/0$/, '');
+    resetVoiceEngineSession();
   });
-  sliderSensitivity.addEventListener('change', () => saveSettings());
-  selectLang.addEventListener('change', (e) => {
-    settings.lang = e.target.value;
+  sliderSensitivity.addEventListener('change', saveSettings);
+  selectLang.addEventListener('change', (event) => {
+    settings.lang = event.target.value;
     if (recognition) recognition.lang = settings.lang;
     saveSettings();
   });
-  toggleVibration.addEventListener('change', (e) => { settings.vibration = e.target.checked; saveSettings(); });
-  toggleSound.addEventListener('change', (e) => { settings.sound = e.target.checked; saveSettings(); });
+  toggleVibration.addEventListener('change', (event) => {
+    settings.vibration = event.target.checked;
+    saveSettings();
+  });
+  toggleSound.addEventListener('change', (event) => {
+    settings.sound = event.target.checked;
+    saveSettings();
+  });
 
   document.getElementById('btn-clear-all-data').addEventListener('click', () => {
-    if (confirm('WARNING: This will delete ALL mantras, history and reset settings. Continue?')) {
-      localStorage.clear();
-      location.reload();
-    }
+    if (!confirm('WARNING: This will delete ALL mantras, history and reset settings. Continue?')) return;
+    localStorage.clear();
+    location.reload();
   });
 
   document.getElementById('btn-export-data').addEventListener('click', () => {
-    const data = { settings, mantras, history };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ settings, mantras, history }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'mantraz-backup.json';
-    a.click();
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'mantraz-backup.json';
+    anchor.click();
+    URL.revokeObjectURL(url);
   });
 
-  // --- 12. UTILS ---
-  const toast = document.getElementById('toast');
-  function showToast(msg) {
-    toast.textContent = msg;
-    toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 3000);
-  }
-
-  // --- START ---
+  window.addEventListener('resize', renderWeeklyChart);
   init();
 });
