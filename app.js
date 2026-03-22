@@ -39,8 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let shouldBeListening = false;
   let speechSupported = false;
   let voiceSessionId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  let workerReady = false;
-  let transcriptQueue = '';
   let latestProcessedTranscript = '';
   const transcriptIdSeen = new Set();
 
@@ -100,7 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (worker) {
     worker.onmessage = ({ data }) => {
       if (!data || data.type !== 'transcript-processed') return;
-      workerReady = true;
       const { increments, normalizedTranscript, matchedTokens } = data.payload;
       latestProcessedTranscript = normalizedTranscript;
       transcriptPreview.textContent = normalizedTranscript || 'Listening...';
@@ -114,7 +111,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
     worker.postMessage({ type: 'reset-session', payload: { sessionId: voiceSessionId } });
-    workerReady = true;
   }
 
   function init() {
@@ -254,7 +250,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function resetVoiceEngineSession() {
     voiceSessionId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    transcriptQueue = '';
     latestProcessedTranscript = '';
     transcriptIdSeen.clear();
     transcriptPreview.textContent = '';
@@ -275,7 +270,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function enqueueTranscript(text, isFinal) {
     const cleaned = String(text || '').trim();
     if (!cleaned) return;
-    transcriptQueue = cleaned;
     transcriptPreview.textContent = cleaned;
     if (!worker) {
       transcriptPreview.textContent = cleaned;
