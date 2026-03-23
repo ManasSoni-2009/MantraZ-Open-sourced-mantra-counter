@@ -392,7 +392,7 @@
         <div class="form-group">
           <label class="form-label" for="form-words">Voice Indicator Words</label>
           <input class="form-input" type="text" id="form-words" placeholder="Comma separated: om, shiva, shivaya" />
-          <span class="form-hint">Words to listen for in your chanting</span>
+          <span class="form-hint">The last trigger becomes the count word for custom mantras</span>
         </div>
         <div class="form-actions">
           <button type="button" class="btn-secondary" id="btn-cancel-mantra">Cancel</button>
@@ -407,7 +407,7 @@
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <h3 class="modal-title">Voice Triggers</h3>
-      <p class="form-hint" style="text-align:center; margin-bottom:20px;">Words the app listens for to count your mantra.</p>
+      <p class="form-hint" style="text-align:center; margin-bottom:20px;">The app listens to all trigger words, but only counts on the final indicator word (for example: swaha).</p>
       <form class="mantra-form" id="form-edit-triggers">
         <div class="form-group">
           <label class="form-label">Comma-separated Words</label>
@@ -454,6 +454,6 @@
   <!-- Toast notification -->
   <div class="toast" id="toast" role="alert" aria-live="polite"></div>
 
-  <script src="app.js"></script>
+  <script src="mantraz-core.js"></script>
 </body>
 </html>
