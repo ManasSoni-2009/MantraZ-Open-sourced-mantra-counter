@@ -28,7 +28,7 @@ jobs:
       - name: Prepare static artifact
         run: |
           mkdir -p deploy
-          cp index.html style.css app.js mantraz-core.js voice-engine-worker.js .nojekyll deploy/
+          cp index.html style.css app.js mantraz-runtime.js mantra-counter-worker.js .nojekyll deploy/
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

@@ -17,7 +17,7 @@
 ## ✨ Highlights
 
 - 🎙️ **Voice-based mantra counting** using browser speech recognition.
-- ⚙️ **On-device transcript processing** via `voice-engine-worker.js` for overlap-aware matching.
+- ⚙️ **On-device transcript processing** via `mantra-counter-worker.js` for overlap-aware matching.
 - 📿 **Mala progress tracking** with animated ring progress and haptic/audio feedback.
 - 📚 **Mantra library** with search, filtering, and custom mantra creation.
 - 📈 **History dashboard** with streaks, total counts, and weekly charting.
@@ -48,7 +48,7 @@ The voice system has two layers:
 The app uses the browser's speech recognition support to capture spoken mantra transcripts in real time.
 
 ### 2. Worker-based matching engine
-`voice-engine-worker.js` processes transcript chunks off the main thread and handles:
+`mantra-counter-worker.js` processes transcript chunks off the main thread and handles:
 
 - transcript normalization,
 - transliteration-friendly token cleanup,
@@ -104,9 +104,9 @@ This keeps the UI responsive while improving count accuracy for repeated mantra 
 ├── .nojekyll
 ├── app.js
 ├── index.html
-├── mantraz-core.js
+├── mantraz-runtime.js
 ├── style.css
-└── voice-engine-worker.js
+└── mantra-counter-worker.js
 ```
 
 ### What each file does
@@ -114,8 +114,8 @@ This keeps the UI responsive while improving count accuracy for repeated mantra 
 - **`index.html`** — app shell, screens, modals, and script entrypoint.
 - **`style.css`** — visual system, layout, animations, and responsive styling.
 - **`app.js`** — lightweight compatibility entry file kept in the repo.
-- **`mantraz-core.js`** — main client-side application logic.
-- **`voice-engine-worker.js`** — transcript matching worker.
+- **`mantraz-runtime.js`** — main client-side application logic.
+- **`mantra-counter-worker.js`** — transcript matching worker.
 - **`.github/workflows/static.yml`** — GitHub Pages deployment workflow.
 - **`.nojekyll`** — prevents Jekyll from interfering with static asset delivery.
 
@@ -171,8 +171,8 @@ The Pages workflow:
 - `index.html`
 - `style.css`
 - `app.js`
-- `mantraz-core.js`
-- `voice-engine-worker.js`
+- `mantraz-runtime.js`
+- `mantra-counter-worker.js`
 - `.nojekyll`
 
 ### To deploy

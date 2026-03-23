@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const weeklyChart = document.getElementById('weekly-chart');
   const toast = document.getElementById('toast');
 
-  const worker = window.Worker ? new Worker('voice-engine-worker.js') : null;
+  const worker = window.Worker ? new Worker('mantra-counter-worker.js') : null;
   if (worker) {
     worker.onmessage = ({ data }) => {
       if (!data || data.type !== 'transcript-processed') return;
